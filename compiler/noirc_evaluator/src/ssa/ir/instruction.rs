@@ -90,8 +90,9 @@ impl Intrinsic {
             // These apply a constraint that the input must fit into a specified number of limbs.
             Intrinsic::ToBits(_) | Intrinsic::ToRadix(_) => true,
 
-            Intrinsic::Sort
-            | Intrinsic::ArrayLen
+            Intrinsic::Sort => true,
+
+            Intrinsic::ArrayLen
             | Intrinsic::SlicePushBack
             | Intrinsic::SlicePushFront
             | Intrinsic::SlicePopBack
@@ -277,19 +278,16 @@ impl Instruction {
                     false
                 }
             }
-            Cast(_, _)
-            | Not(_)
-            | Truncate { .. }
-            | Allocate
-            | Load { .. }
-            | ArrayGet { .. }
-            | ArraySet { .. } => false,
+
+            Cast(_, _) | Not(_) | Truncate { .. } | Allocate | Load { .. } => false,
 
             Constrain(..)
             | Store { .. }
             | EnableSideEffects { .. }
             | IncrementRc { .. }
-            | RangeCheck { .. } => true,
+            | RangeCheck { .. }
+            | ArrayGet { .. }
+            | ArraySet { .. } => true,
 
             // Some `Intrinsic`s have side effects so we must check what kind of `Call` this is.
             Call { func, .. } => match dfg[*func] {
