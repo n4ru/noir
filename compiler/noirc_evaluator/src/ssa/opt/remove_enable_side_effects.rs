@@ -88,7 +88,7 @@ impl Context {
             // before we insert this new instruction.
             if instruction.has_side_effects(&function.dfg) {
                 if let Some(enable_side_effects_instruction_id) =
-                    last_side_effects_enabled_instruction
+                    last_side_effects_enabled_instruction.take()
                 {
                     new_instructions.push(enable_side_effects_instruction_id);
                 }
