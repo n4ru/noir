@@ -278,13 +278,19 @@ impl Instruction {
                 }
             }
 
-            Cast(_, _) | Not(_) | Truncate { .. } | Allocate | Load { .. }  | ArrayGet { .. } | ArraySet { .. }=> false,
+            Cast(_, _)
+            | Not(_)
+            | Truncate { .. }
+            | Allocate
+            | Load { .. }
+            | ArrayGet { .. }
+            | ArraySet { .. } => false,
 
             Constrain(..)
             | Store { .. }
             | EnableSideEffects { .. }
             | IncrementRc { .. }
-            | RangeCheck { .. } => true,             
+            | RangeCheck { .. } => true,
 
             // Some `Intrinsic`s have side effects so we must check what kind of `Call` this is.
             Call { func, .. } => match dfg[*func] {

@@ -86,7 +86,12 @@ impl Context {
 
             // If we hit an instruction with side effects then we must insert the `Instruction::EnableSideEffects`
             // before we insert this new instruction.
-            if instruction.has_side_effects(&function.dfg) || matches!(instruction, Instruction::ArrayGet{..} | Instruction::ArraySet {..}) {
+            if instruction.has_side_effects(&function.dfg)
+                || matches!(
+                    instruction,
+                    Instruction::ArrayGet { .. } | Instruction::ArraySet { .. }
+                )
+            {
                 if let Some(enable_side_effects_instruction_id) =
                     last_side_effects_enabled_instruction.take()
                 {
