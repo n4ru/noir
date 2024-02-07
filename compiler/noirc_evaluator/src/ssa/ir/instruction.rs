@@ -90,9 +90,8 @@ impl Intrinsic {
             // These apply a constraint that the input must fit into a specified number of limbs.
             Intrinsic::ToBits(_) | Intrinsic::ToRadix(_) => true,
 
-            Intrinsic::Sort => true,
-
-            Intrinsic::ArrayLen
+            Intrinsic::Sort
+            | Intrinsic::ArrayLen
             | Intrinsic::SlicePushBack
             | Intrinsic::SlicePushFront
             | Intrinsic::SlicePopBack
@@ -279,26 +278,13 @@ impl Instruction {
                 }
             }
 
-            Cast(_, _) | Not(_) | Truncate { .. } | Allocate | Load { .. } => false,
+            Cast(_, _) | Not(_) | Truncate { .. } | Allocate | Load { .. }  | ArrayGet { .. } | ArraySet { .. }=> false,
 
             Constrain(..)
             | Store { .. }
             | EnableSideEffects { .. }
             | IncrementRc { .. }
-            | RangeCheck { .. } => true,
-
-            ArrayGet { array, index } | ArraySet { array, index, .. } => {
-                // This is janky but we only use the side effects flag to check that we're not accessing past the end of the array
-                // unconditionally to provide a compiler error.
-                let array_len = if let Value::Array { array, .. } = &dfg[*array] {
-                    array.len() as u128
-                } else {
-                    return false;
-                };
-                let index_const = dfg.get_numeric_constant(*index);
-
-                index_const.map_or(false, |index| index.to_u128() >= array_len)
-            }
+            | RangeCheck { .. } => true,             
 
             // Some `Intrinsic`s have side effects so we must check what kind of `Call` this is.
             Call { func, .. } => match dfg[*func] {
