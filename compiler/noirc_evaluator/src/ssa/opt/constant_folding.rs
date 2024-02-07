@@ -99,13 +99,25 @@ impl Context {
         let mut side_effects_enabled_var =
             function.dfg.make_constant(FieldElement::one(), Type::bool());
 
+        // Contains sets of values which are constrained to be equivalent to each other.
+        //
+        // The mapping's structure is `side_effects_enabled_var => (constrained_value => simplified_value)`.
+        //
+        // We partition the maps of constrained values according to the side-effects flag at the point
+        // at which the values are constrained. This prevents constraints which are only sometimes enforced
+        // being used to modify the rest of the program.
+        let mut constraint_simplification_mappings: HashMap<ValueId, HashMap<ValueId, ValueId>> =
+            HashMap::default();
+        let mut side_effects_enabled_var =
+            function.dfg.make_constant(FieldElement::one(), Type::bool());
+
         for instruction_id in instructions {
             self.fold_constants_into_instruction(
                 &mut function.dfg,
                 block,
                 instruction_id,
                 &mut cached_instruction_results,
-                &mut constrained_values,
+                &mut constraint_simplification_mappings,
                 &mut side_effects_enabled_var,
             );
         }
@@ -118,14 +130,12 @@ impl Context {
         block: BasicBlockId,
         id: InstructionId,
         instruction_result_cache: &mut HashMap<Instruction, Vec<ValueId>>,
-        constrained_values: &mut HashMap<ValueId, HashMap<ValueId, ValueId>>,
+        constraint_simplification_mappings: &mut HashMap<ValueId, HashMap<ValueId, ValueId>>,
         side_effects_enabled_var: &mut ValueId,
     ) {
-        let instruction = Self::resolve_instruction(
-            id,
-            dfg,
-            constrained_values.entry(*side_effects_enabled_var).or_default(),
-        );
+        let constraint_simplification_mapping =
+            constraint_simplification_mappings.entry(*side_effects_enabled_var).or_default();
+        let instruction = Self::resolve_instruction(id, dfg, constraint_simplification_mapping);
         let old_results = dfg.instruction_results(id).to_vec();
 
         // If a copy of this instruction exists earlier in the block, then reuse the previous results.
@@ -144,7 +154,7 @@ impl Context {
             new_results,
             dfg,
             instruction_result_cache,
-            constrained_values.entry(*side_effects_enabled_var).or_default(),
+            constraint_simplification_mapping,
         );
 
         // If we just inserted an `Instruction::EnableSideEffects`, we need to update `side_effects_enabled_var`
@@ -158,7 +168,7 @@ impl Context {
     fn resolve_instruction(
         instruction_id: InstructionId,
         dfg: &DataFlowGraph,
-        constraint_cache: &HashMap<ValueId, ValueId>,
+        constraint_simplification_mapping: &HashMap<ValueId, ValueId>,
     ) -> Instruction {
         let instruction = dfg[instruction_id].clone();
 
@@ -180,7 +190,8 @@ impl Context {
         }
 
         // Resolve any inputs to ensure that we're comparing like-for-like instructions.
-        instruction.map_values(|value_id| resolve_cache(dfg, constraint_cache, value_id))
+        instruction
+            .map_values(|value_id| resolve_cache(dfg, constraint_simplification_mapping, value_id))
     }
 
     /// Pushes a new [`Instruction`] into the [`DataFlowGraph`] which applies any optimizations
@@ -219,7 +230,7 @@ impl Context {
         instruction_results: Vec<ValueId>,
         dfg: &DataFlowGraph,
         instruction_result_cache: &mut HashMap<Instruction, Vec<ValueId>>,
-        constraint_cache: &mut HashMap<ValueId, ValueId>,
+        constraint_simplification_mapping: &mut HashMap<ValueId, ValueId>,
     ) {
         if self.use_constraint_info {
             // If the instruction was a constraint, then create a link between the two `ValueId`s
@@ -232,18 +243,18 @@ impl Context {
 
                     // Prefer replacing with constants where possible.
                     (Value::NumericConstant { .. }, _) => {
-                        constraint_cache.insert(rhs, lhs);
+                        constraint_simplification_mapping.insert(rhs, lhs);
                     }
                     (_, Value::NumericConstant { .. }) => {
-                        constraint_cache.insert(lhs, rhs);
+                        constraint_simplification_mapping.insert(lhs, rhs);
                     }
                     // Otherwise prefer block parameters over instruction results.
                     // This is as block parameters are more likely to be a single witness rather than a full expression.
                     (Value::Param { .. }, Value::Instruction { .. }) => {
-                        constraint_cache.insert(rhs, lhs);
+                        constraint_simplification_mapping.insert(rhs, lhs);
                     }
                     (Value::Instruction { .. }, Value::Param { .. }) => {
-                        constraint_cache.insert(lhs, rhs);
+                        constraint_simplification_mapping.insert(lhs, rhs);
                     }
                     (_, _) => (),
                 }
