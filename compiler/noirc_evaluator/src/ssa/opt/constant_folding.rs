@@ -94,10 +94,6 @@ impl Context {
 
         // Cache of instructions without any side-effects along with their outputs.
         let mut cached_instruction_results: HashMap<Instruction, Vec<ValueId>> = HashMap::default();
-        let mut constrained_values: HashMap<ValueId, HashMap<ValueId, ValueId>> =
-            HashMap::default();
-        let mut side_effects_enabled_var =
-            function.dfg.make_constant(FieldElement::one(), Type::bool());
 
         // Contains sets of values which are constrained to be equivalent to each other.
         //
