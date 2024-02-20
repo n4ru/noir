@@ -96,7 +96,7 @@ impl DebugInstrumenter {
         self.walk_scope(&mut func.body.0, func.span);
 
         // prepend fn params:
-        func.body.0 = vec![set_fn_params, func.body.0.clone()].concat();
+        func.body.0 = [set_fn_params, func.body.0.clone()].concat();
     }
 
     // Modify a vector of statements in-place, adding instrumentation for sets and drops.
@@ -130,7 +130,7 @@ impl DebugInstrumenter {
         let span = Span::empty(span.end());
 
         // drop scope variables
-        let scope_vars = self.scope.pop().unwrap_or(HashMap::default());
+        let scope_vars = self.scope.pop().unwrap_or_default();
         let drop_vars_stmts = scope_vars.values().map(|var_id| build_drop_var_stmt(*var_id, span));
         statements.extend(drop_vars_stmts);
 
@@ -291,6 +291,7 @@ impl DebugInstrumenter {
                 )
             }
         };
+
         let ret_kind =
             ast::StatementKind::Expression(id_expr(&ident("__debug_expr", expression_span)));
 
@@ -470,21 +471,24 @@ pub fn build_debug_crate_file() -> String {
         .to_string(),
         (1..=MAX_MEMBER_ASSIGN_DEPTH)
             .map(|n| {
+                // The variable signature has to be generic as Noir supports using any polymorphic integer as an index.
+                // If we were to set a specific type for index signatures here, such as `Field`, we will error in
+                // type checking if we attempt to index with a different type such as `u8`.
                 let var_sig =
-                    (0..n).map(|i| format!["_v{i}: Field"]).collect::<Vec<String>>().join(", ");
+                    (0..n).map(|i| format!["_v{i}: Index"]).collect::<Vec<String>>().join(", ");
                 let vars = (0..n).map(|i| format!["_v{i}"]).collect::<Vec<String>>().join(", ");
                 format!(
                     r#"
                 #[oracle(__debug_member_assign_{n})]
-                unconstrained fn __debug_oracle_member_assign_{n}<T>(
+                unconstrained fn __debug_oracle_member_assign_{n}<T, Index>(
                     _var_id: u32, _value: T, {var_sig}
                 ) {{}}
-                unconstrained fn __debug_inner_member_assign_{n}<T>(
+                unconstrained fn __debug_inner_member_assign_{n}<T, Index>(
                     var_id: u32, value: T, {var_sig}
                 ) {{
                     __debug_oracle_member_assign_{n}(var_id, value, {vars});
                 }}
-                pub fn __debug_member_assign_{n}<T>(var_id: u32, value: T, {var_sig}) {{
+                pub fn __debug_member_assign_{n}<T, Index>(var_id: u32, value: T, {var_sig}) {{
                     __debug_inner_member_assign_{n}(var_id, value, {vars});
                 }}
 

@@ -684,9 +684,7 @@ impl<'a> FunctionContext<'a> {
         &mut self,
         assert_message: &Option<Box<Expression>>,
     ) -> Result<Option<Box<ConstrainError>>, RuntimeError> {
-        let Some(assert_message_expr) = assert_message else {
-            return Ok(None)
-        };
+        let Some(assert_message_expr) = assert_message else { return Ok(None) };
 
         if let ast::Expression::Literal(ast::Literal::Str(assert_message)) =
             assert_message_expr.as_ref()
@@ -723,11 +721,6 @@ impl<'a> FunctionContext<'a> {
     fn codegen_assign(&mut self, assign: &ast::Assign) -> Result<Values, RuntimeError> {
         let lhs = self.extract_current_value(&assign.lvalue)?;
         let rhs = self.codegen_expression(&assign.expression)?;
-
-        rhs.clone().for_each(|value| {
-            let value = value.eval(self);
-            self.builder.increment_array_reference_count(value);
-        });
 
         self.assign_new_value(lhs, rhs);
         Ok(Self::unit_value())

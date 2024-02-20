@@ -216,6 +216,11 @@ impl FunctionBuilder {
         operator: BinaryOp,
         rhs: ValueId,
     ) -> ValueId {
+        assert_eq!(
+            self.type_of_value(lhs),
+            self.type_of_value(rhs),
+            "ICE - Binary instruction operands must have the same type"
+        );
         let instruction = Instruction::Binary(Binary { lhs, rhs, operator });
         self.insert_instruction(instruction, None).first()
     }
@@ -384,9 +389,9 @@ impl FunctionBuilder {
                 }
             }
             Type::Array(..) | Type::Slice(..) => {
+                self.insert_instruction(Instruction::IncrementRc { value }, None);
                 // If there are nested arrays or slices, we wait until ArrayGet
                 // is issued to increment the count of that array.
-                self.insert_instruction(Instruction::IncrementRc { value }, None);
             }
         }
     }
