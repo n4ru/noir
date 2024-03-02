@@ -4,10 +4,13 @@ mod constant_backpropagation;
 mod general;
 mod redundant_range;
 mod unused_memory;
+mod witness_rebinding;
 
 pub(crate) use general::GeneralOptimizer;
 pub(crate) use redundant_range::RangeOptimizer;
 use tracing::info;
+
+use crate::compiler::optimizers::witness_rebinding::WitnessRebindingOptimizer;
 
 use self::constant_backpropagation::ConstantBackpropagationOptimizer;
 use self::unused_memory::UnusedMemoryOptimizer;
@@ -61,6 +64,9 @@ pub(super) fn optimize_internal(acir: Circuit) -> (Circuit, Vec<usize>) {
     let (acir, acir_opcode_positions) =
         ConstantBackpropagationOptimizer::backpropagate_constants(acir, acir_opcode_positions);
 
+    let (acir, acir_opcode_positions) =
+        WitnessRebindingOptimizer::backpropagate_constants(acir, acir_opcode_positions);
+
     // Range optimization pass
     let range_optimizer = RangeOptimizer::new(acir);
     let (acir, acir_opcode_positions) =
@@ -68,6 +74,9 @@ pub(super) fn optimize_internal(acir: Circuit) -> (Circuit, Vec<usize>) {
 
     let (acir, acir_opcode_positions) =
         ConstantBackpropagationOptimizer::backpropagate_constants(acir, acir_opcode_positions);
+
+    let (acir, acir_opcode_positions) =
+        WitnessRebindingOptimizer::backpropagate_constants(acir, acir_opcode_positions);
 
     info!("Number of opcodes after: {}", acir.opcodes.len());
 
